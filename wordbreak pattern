@@ -1,0 +1,458 @@
+# Pattern 34: Word Break Style — Dynamic Programming
+
+## Problems Covered
+
+- [LeetCode 139 — Word Break](https://leetcode.com/problems/word-break/)
+- [LeetCode 140 — Word Break II](https://leetcode.com/problems/word-break-ii/)
+
+---
+
+# Part 1: LeetCode 139 — Word Break
+
+## 1. Problem Statement
+
+Given a string `s` and a list of strings `wordDict`, return `true` if `s` can be segmented into a sequence of one or more dictionary words.
+
+- Dictionary words can be reused.
+- Characters must remain in their original order.
+- Every character must belong to a valid dictionary word.
+
+### Example 1
+
+**Input**
+```cpp
+s = "leetcode";
+wordDict = ["leet", "code"];
+```
+
+**Output**
+```cpp
+true
+```
+
+**Explanation**
+
+`"leetcode" = "leet" + "code"`
+
+Both words exist in the dictionary.
+
+### Example 2
+
+**Input**
+```cpp
+s = "applepenapple";
+wordDict = ["apple", "pen"];
+```
+
+**Output**
+```cpp
+true
+```
+
+**Explanation**
+
+`"apple" + "pen" + "apple"`
+
+Dictionary words may be reused.
+
+### Example 3
+
+**Input**
+```cpp
+s = "catsandog";
+wordDict = ["cats", "dog", "sand", "and", "cat"];
+```
+
+**Output**
+```cpp
+false
+```
+
+No valid segmentation can consume the entire string.
+
+---
+
+## 2. First Thought — How Should We Approach It?
+
+Do not immediately think about DP.
+
+Ask yourself:
+
+**Can I split the string into smaller pieces such that every piece belongs to the dictionary?**
+
+For `"leetcode"`:
+
+```text
+leetcode
+   |
+ leet + code
+   |
+ Both words exist
+   |
+ Answer = true
+```
+
+But we cannot simply check whether every individual character exists in the dictionary. We need to check complete substrings.
+
+### Brute Force Idea
+
+Try every possible cut in the string.
+
+For each cut:
+
+1. Check whether the first part is valid.
+2. Check whether the next substring is a dictionary word.
+3. If both conditions hold, continue from the next position.
+4. If a choice fails, try another cut.
+
+The problem with brute force is that the same suffix may be solved repeatedly.
+
+**Observation:** The answer for a prefix can be reused. This leads to Dynamic Programming.
+
+---
+
+## 3. DP State
+
+Define:
+
+`dp[i] = true` if the first `i` characters of `s` can be segmented into dictionary words.
+
+Otherwise, `dp[i] = false`.
+
+For a string of length `n`, the DP array has `n + 1` elements.
+
+### Base Case
+
+```cpp
+dp[0] = true;
+```
+
+Why?
+
+An empty prefix requires no words. It is a valid starting point from which we can build the first dictionary word.
+
+### Transition
+
+Suppose we want to calculate `dp[i]`.
+
+Try every previous cut `j`, where `0 <= j < i`.
+
+The substring from `j` to `i - 1` is:
+
+```cpp
+s.substr(j, i - j)
+```
+
+If the prefix before the cut is valid and the remaining substring is in the dictionary, the entire prefix is valid.
+
+```cpp
+if (dp[j] && dict.count(s.substr(j, i - j))) {
+    dp[i] = true;
+}
+```
+
+### Mathematical Formula
+
+\[
+dp[i] = \bigvee_{0 \le j < i}
+\left(dp[j] \land
+[s[j \ldots i-1] \in wordDict]\right)
+\]
+
+In simple words:
+
+**Previous prefix valid AND current substring is a dictionary word = current prefix valid.**
+
+---
+
+## 4. Dry Run
+
+Input:
+
+```cpp
+s = "leetcode";
+wordDict = ["leet", "code"];
+```
+
+String length = 8.
+
+Initially:
+
+```text
+dp = [true, false, false, false, false,
+      false, false, false, false]
+```
+
+| i | Prefix | Reason | dp[i] |
+|---:|---|---|---|
+| 0 | Empty | Base case | true |
+| 1 | l | No valid cut | false |
+| 2 | le | No valid cut | false |
+| 3 | lee | No valid cut | false |
+| 4 | leet | Dictionary contains leet; dp[0] is true | true |
+| 5 | leetc | No valid cut | false |
+| 6 | leetco | No valid cut | false |
+| 7 | leetcod | No valid cut | false |
+| 8 | leetcode | dp[4] is true and code is in dictionary | true |
+
+Final answer:
+
+```cpp
+return dp[8];  // true
+```
+
+---
+
+## 5. C++ Solution — Word Break
+
+```cpp
+class Solution {
+public:
+    bool wordBreak(string s, vector<string>& wordDict) {
+        unordered_set<string> dict(
+            wordDict.begin(), wordDict.end()
+        );
+
+        int n = s.size();
+        vector<bool> dp(n + 1, false);
+
+        dp[0] = true;
+
+        for (int i = 1; i <= n; i++) {
+            for (int j = 0; j < i; j++) {
+                if (dp[j] &&
+                    dict.count(s.substr(j, i - j))) {
+                    dp[i] = true;
+                    break;
+                }
+            }
+        }
+
+        return dp[n];
+    }
+};
+```
+
+### Why Use `unordered_set`?
+
+Dictionary lookup is average O(1), assuming normal hash-table behaviour.
+
+This avoids scanning the entire dictionary for every substring.
+
+### Complexity
+
+Let:
+
+- `n` = length of `s`
+- `D` = total number of characters in the dictionary
+
+For this exact implementation:
+
+- **Time:** Worst case O(n³ + D), because `substr()` creates string copies inside the nested loops.
+- **Space:** O(n + D), including the DP array and dictionary storage; string and hash-table overhead is excluded from the simplified bound.
+
+The DP state count is O(n²) transitions, but substring copying can add another factor of `n`.
+
+---
+
+## 6. Common Mistakes
+
+### Mistake 1: Forgetting the base case
+
+Incorrect:
+```cpp
+vector<bool> dp(n + 1, false);
+```
+
+Correct:
+```cpp
+dp[0] = true;
+```
+
+Without this, the first dictionary word cannot establish a valid prefix.
+
+### Mistake 2: Checking only the last word
+
+The entire string may be valid even when the final word is valid only after a valid earlier prefix.
+
+Always check both:
+
+```cpp
+dp[j] && dict.count(s.substr(j, i - j))
+```
+
+### Mistake 3: Confusing substring and subsequence
+
+A substring must be continuous.
+
+For example, `"leet"` is a substring of `"leetcode"`, but characters cannot be skipped or rearranged when splitting the string.
+
+### Mistake 4: Thinking every dictionary word must be used
+
+Only words needed for a valid segmentation are used. Other dictionary words can be ignored.
+
+---
+
+# Part 2: LeetCode 140 — Word Break II
+
+## 1. Problem Statement
+
+Given a string `s` and a dictionary `wordDict`, return all possible sentences formed by inserting spaces into `s` such that every word is in the dictionary.
+
+Words can be reused.
+
+Unlike LC 139, we need to return every valid sentence, not just `true` or `false`.
+
+Problem: https://leetcode.com/problems/word-break-ii/
+
+### Example
+
+**Input**
+```cpp
+s = "catsanddog";
+wordDict = ["cat", "cats", "and", "sand", "dog"];
+```
+
+**Output**
+```cpp
+["cats and dog", "cat sand dog"]
+```
+
+Both sentences are valid.
+
+---
+
+## 2. First Thought
+
+LC 139 asks:
+
+**Is at least one valid segmentation possible?**
+
+LC 140 asks:
+
+**What are all valid segmentations?**
+
+The decision problem becomes a path-enumeration problem.
+
+We can use backtracking to try valid words. Memoization helps avoid repeatedly solving the same suffix.
+
+### Core Idea
+
+At each position:
+
+1. Try every possible next word.
+2. If it exists in the dictionary, recursively solve the remaining suffix.
+3. Combine the chosen word with every valid sentence from that suffix.
+4. Memoize the sentences for each starting index.
+
+---
+
+## 3. C++ Solution — Word Break II
+
+```cpp
+class Solution {
+public:
+    unordered_set<string> dict;
+    unordered_map<int, vector<string>> memo;
+
+    vector<string> dfs(const string& s, int start) {
+        if (memo.count(start)) {
+            return memo[start];
+        }
+
+        vector<string> result;
+
+        if (start == s.size()) {
+            result.push_back("");
+            return memo[start] = result;
+        }
+
+        for (int end = start + 1; end <= s.size(); end++) {
+            string word = s.substr(start, end - start);
+
+            if (!dict.count(word)) {
+                continue;
+            }
+
+            vector<string> suffixes = dfs(s, end);
+
+            for (const string& suffix : suffixes) {
+                if (suffix.empty()) {
+                    result.push_back(word);
+                } else {
+                    result.push_back(word + " " + suffix);
+                }
+            }
+        }
+
+        return memo[start] = result;
+    }
+
+    vector<string> wordBreak(string s, vector<string>& wordDict) {
+        dict = unordered_set<string>(
+            wordDict.begin(), wordDict.end()
+        );
+
+        memo.clear();
+        return dfs(s, 0);
+    }
+};
+```
+
+### Why Does the Base Case Return an Empty String?
+
+```cpp
+if (start == s.size()) {
+    result.push_back("");
+    return memo[start] = result;
+}
+```
+
+An empty suffix means the chosen words have consumed the entire string.
+
+Returning one empty suffix allows the final chosen word to be added as a complete sentence.
+
+It does **not** mean an empty sentence should appear in the final answer.
+
+### Complexity
+
+The number of valid sentences can be exponential in the length of the string.
+
+- **Time:** Output-sensitive and potentially exponential, with additional substring and sentence-building costs.
+- **Space:** Memoization stores results for multiple suffixes; total memory can also be exponential because the output itself can be exponential.
+
+It is not correct to claim a simple O(n²) total time for this solution.
+
+---
+
+## 4. LC 139 vs LC 140
+
+| Feature | LC 139 | LC 140 |
+|---|---|---|
+| Goal | Determine if segmentation exists | Return every valid sentence |
+| Return type | `bool` | `vector<string>` |
+| Main technique | DP | Backtracking + memoization |
+| State | `dp[i]` | `memo[start]` |
+| Repeated suffixes | Reuse boolean result | Reuse all suffix sentences |
+| Output size | One boolean | Potentially exponential |
+
+---
+
+## 5. Pattern Recognition
+
+Whenever a problem asks you to split a string into dictionary words, think:
+
+1. Is a valid segmentation possible? → Word Break I.
+2. Return all valid segmentations? → Word Break II.
+3. Can the same suffix be reached from multiple paths? → Consider memoization.
+4. Does the answer require all paths? → Expect output-sensitive or exponential complexity.
+
+### Final Memory Trick
+
+**LC 139 = Can I break it?**
+
+**LC 140 = Show me every way to break it.**
+
+For LC 139, store whether a prefix is valid.
+
+For LC 140, store all valid sentences starting from each index.
